@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>อนุมัติการจอง - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — อนุมัติการจอง</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>รายการรออนุมัติ</h2>
+    <table>
+      <thead><tr><th>ห้อง</th><th>ผู้จอง</th><th>วันเวลา</th><th>วัตถุประสงค์</th><th>สถานะ</th><th>การทำงาน</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6">กำลังโหลด...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+
+function fmtDt(s) {
+  return new Date(s).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+}
+function statusBadge(status) {
+  const labels = { pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', rejected: 'ปฏิเสธ', completed: 'เสร็จสิ้น' };
+  return `<span class="badge ${status}">${labels[status] || status}</span>`;
+}
+
+async function loadBookings() {
+  const res = await apiFetch('/api/bookings');
+  const data = await res.json();
+  const pending = data.bookings.filter(b => b.status === 'pending');
+  const rows = document.getElementById('rows');
+  if (!pending.length) {
+    rows.innerHTML = '<tr><td colspan="6">ไม่มีรายการรออนุมัติ</td></tr>';
+    return;
+  }
+  rows.innerHTML = pending.map(b => `
+    <tr>
+      <td>${b.room_name}</td>
+      <td>${b.user_name}</td>
+      <td>${fmtDt(b.start_dt)} - ${fmtDt(b.end_dt)}</td>
+      <td>${b.purpose || '-'}</td>
+      <td>${statusBadge(b.status)}</td>
+      <td>
+        <button class="approveBtn" data-id="${b.id}">อนุมัติ</button>
+        <button class="danger rejectBtn" data-id="${b.id}">ปฏิเสธ</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('rows').addEventListener('click', async (e) => {
+  const id = e.target.dataset.id;
+  if (!id) return;
+  if (e.target.classList.contains('approveBtn')) {
+    const res = await apiFetch(`/api/bookings/${id}/approve`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    loadBookings();
+  } else if (e.target.classList.contains('rejectBtn')) {
+    const comment = prompt('เหตุผลในการปฏิเสธ:') || '';
+    const res = await apiFetch(`/api/bookings/${id}/reject`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }) });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    loadBookings();
+  }
+});
+
+(async () => {
+  currentUser = await requireAuth({ approverOnly: true });
+  await loadBookings();
+})();
+</script>
+</body>
+</html>

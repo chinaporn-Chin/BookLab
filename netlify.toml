@@ -1,0 +1,55 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+# --- specific (dynamic) routes must come before the general ones ---
+
+[[redirects]]
+  from = "/api/bookings/:id/requests"
+  to = "/.netlify/functions/booking-requests?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/:id/approve"
+  to = "/.netlify/functions/booking-approve?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/:id/reject"
+  to = "/.netlify/functions/booking-reject?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings/:id/complete"
+  to = "/.netlify/functions/booking-complete?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/bookings"
+  to = "/.netlify/functions/bookings"
+  status = 200
+
+[[redirects]]
+  from = "/api/inventory/:id"
+  to = "/.netlify/functions/inventory-item?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/inventory"
+  to = "/.netlify/functions/inventory"
+  status = 200
+
+[[redirects]]
+  from = "/api/reports/chemical-usage"
+  to = "/.netlify/functions/reports"
+  status = 200
+
+[[redirects]]
+  from = "/api/rooms"
+  to = "/.netlify/functions/rooms"
+  status = 200
+
+[[redirects]]
+  from = "/api/me"
+  to = "/.netlify/functions/me"
+  status = 200

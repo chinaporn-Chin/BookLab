@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — Dashboard</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>ภาพรวมการจองห้อง LAB (Real-time)</h2>
+    <p class="muted">อัปเดตอัตโนมัติทุก 30 วินาที</p>
+    <table>
+      <thead>
+        <tr><th>ห้อง</th><th>วันเวลา</th><th>ผู้จอง</th><th>วัตถุประสงค์</th><th>สถานะ</th></tr>
+      </thead>
+      <tbody id="bookingRows"><tr><td colspan="5">กำลังโหลด...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+
+function fmtDt(s) {
+  const d = new Date(s);
+  return d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function statusBadge(status) {
+  const labels = { pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', rejected: 'ปฏิเสธ', completed: 'เสร็จสิ้น' };
+  return `<span class="badge ${status}">${labels[status] || status}</span>`;
+}
+
+async function loadBookings() {
+  const res = await apiFetch('/api/bookings');
+  if (res.status === 401) { window.location.href = 'index.html'; return; }
+  const data = await res.json();
+  const rows = document.getElementById('bookingRows');
+  if (!data.bookings.length) {
+    rows.innerHTML = '<tr><td colspan="5">ยังไม่มีการจอง</td></tr>';
+    return;
+  }
+  rows.innerHTML = data.bookings.map(b => `
+    <tr>
+      <td>${b.room_name}</td>
+      <td>${fmtDt(b.start_dt)} - ${fmtDt(b.end_dt)}</td>
+      <td>${b.user_name}</td>
+      <td>${b.purpose || '-'}</td>
+      <td>${statusBadge(b.status)}</td>
+    </tr>
+  `).join('');
+}
+
+(async () => {
+  currentUser = await requireAuth();
+  await loadBookings();
+  setInterval(loadBookings, 30000);
+})();
+</script>
+</body>
+</html>

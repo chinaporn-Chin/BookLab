@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>จองห้อง - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — จองห้อง</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>จองห้อง LAB</h2>
+    <form id="bookingForm">
+      <div class="field">
+        <label>ห้อง</label>
+        <select id="room_id" required></select>
+      </div>
+      <div class="field">
+        <label>วันที่</label>
+        <input type="date" id="booking_date" required>
+        <p class="muted" id="minDateHint"></p>
+      </div>
+      <div class="field">
+        <label>คาบเริ่ม</label>
+        <select id="start_period" required></select>
+      </div>
+      <div class="field">
+        <label>คาบสิ้นสุด</label>
+        <select id="end_period" required></select>
+      </div>
+      <div class="field">
+        <label>วัตถุประสงค์</label>
+        <textarea id="purpose" rows="2"></textarea>
+      </div>
+      <div class="field">
+        <label>สารเคมีที่ต้องการใช้ (ถ้ามี)</label>
+        <div id="chemRows"></div>
+        <button type="button" class="secondary" id="addChemRow">+ เพิ่มสารเคมี</button>
+      </div>
+      <button type="submit">ส่งคำขอจอง</button>
+      <div id="msg"></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>การจองของฉัน</h2>
+    <table>
+      <thead><tr><th>ห้อง</th><th>วันเวลา</th><th>วัตถุประสงค์</th><th>สถานะ</th><th>การทำงาน</th></tr></thead>
+      <tbody id="myRows"><tr><td colspan="5">กำลังโหลด...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="completeCard" style="display:none;">
+    <h2>บันทึกการใช้สารเคมีจริง</h2>
+    <div id="completeRows"></div>
+    <button id="confirmCompleteBtn">ยืนยันเสร็จสิ้น</button>
+    <button type="button" class="secondary" id="cancelCompleteBtn">ยกเลิก</button>
+    <div id="completeMsg"></div>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+let chemicals = [];
+let rooms = [];
+let completingBookingId = null;
+
+const PERIODS = [
+  { no: 1, start: '08:00', end: '08:50' },
+  { no: 2, start: '08:50', end: '09:40' },
+  { no: 3, start: '09:40', end: '10:30' },
+  { no: 4, start: '10:30', end: '11:20' },
+  { no: 5, start: '11:20', end: '12:10' },
+  { no: 6, start: '12:10', end: '13:00' },
+  { no: 7, start: '13:00', end: '13:50' },
+  { no: 8, start: '13:50', end: '14:40' },
+  { no: 9, start: '14:40', end: '15:30' },
+  { no: 10, start: '15:30', end: '16:20' },
+];
+
+function fmtDt(s) {
+  return new Date(s).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+}
+function statusBadge(status) {
+  const labels = { pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', rejected: 'ปฏิเสธ', completed: 'เสร็จสิ้น' };
+  return `<span class="badge ${status}">${labels[status] || status}</span>`;
+}
+
+function populatePeriods() {
+  const opts = PERIODS.map(p => `<option value="${p.no}">คาบ ${p.no} (${p.start}-${p.end})</option>`).join('');
+  document.getElementById('start_period').innerHTML = opts;
+  document.getElementById('end_period').innerHTML = opts;
+}
+
+function setMinBookingDate() {
+  const minDate = new Date();
+  minDate.setHours(0, 0, 0, 0);
+  minDate.setDate(minDate.getDate() + 2);
+  const pad = (n) => String(n).padStart(2, '0');
+  const minStr = `${minDate.getFullYear()}-${pad(minDate.getMonth() + 1)}-${pad(minDate.getDate())}`;
+  document.getElementById('booking_date').min = minStr;
+  document.getElementById('minDateHint').textContent =
+    `* ต้องจองล่วงหน้าอย่างน้อย 2 วัน (จองได้ตั้งแต่ ${minDate.toLocaleDateString('th-TH')} เป็นต้นไป)`;
+}
+
+async function loadRooms() {
+  const res = await apiFetch('/api/rooms');
+  const data = await res.json();
+  rooms = data.rooms;
+  document.getElementById('room_id').innerHTML = rooms.map(r => `<option value="${r.id}">${r.name} - ${r.description || ''}</option>`).join('');
+}
+
+async function loadChemicals() {
+  const res = await apiFetch('/api/inventory');
+  const data = await res.json();
+  chemicals = data.inventory;
+}
+
+function chemRowHtml() {
+  return `
+    <div class="chem-row">
+      <select class="chem-select">
+        <option value="">-- เลือกสารเคมี --</option>
+        ${chemicals.map(c => `<option value="${c.id}">${c.name} (${c.unit})</option>`).join('')}
+      </select>
+      <input type="number" class="chem-qty" placeholder="ปริมาณ" min="0" step="0.01">
+      <button type="button" class="danger removeChem">ลบ</button>
+    </div>
+  `;
+}
+
+document.getElementById('addChemRow').addEventListener('click', () => {
+  const div = document.createElement('div');
+  div.innerHTML = chemRowHtml();
+  document.getElementById('chemRows').appendChild(div.firstElementChild);
+});
+
+document.getElementById('chemRows').addEventListener('click', (e) => {
+  if (e.target.classList.contains('removeChem')) {
+    e.target.closest('.chem-row').remove();
+  }
+});
+
+document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  msg.innerHTML = '';
+
+  const date = document.getElementById('booking_date').value;
+  const startNo = Number(document.getElementById('start_period').value);
+  const endNo = Number(document.getElementById('end_period').value);
+
+  if (endNo < startNo) {
+    msg.innerHTML = `<div class="error">คาบสิ้นสุดต้องไม่น้อยกว่าคาบเริ่ม</div>`;
+    return;
+  }
+
+  const startPeriod = PERIODS.find(p => p.no === startNo);
+  const endPeriod = PERIODS.find(p => p.no === endNo);
+  const start_dt = `${date}T${startPeriod.start}`;
+  const end_dt = `${date}T${endPeriod.end}`;
+
+  const chemRows = [...document.querySelectorAll('.chem-row')];
+  const chemicalsPayload = chemRows.map(row => {
+    const id = row.querySelector('.chem-select').value;
+    const qty = row.querySelector('.chem-qty').value;
+    return id && qty ? { chemical_id: id, requested_qty: Number(qty) } : null;
+  }).filter(Boolean);
+
+  const payload = {
+    room_id: document.getElementById('room_id').value,
+    start_dt,
+    end_dt,
+    purpose: document.getElementById('purpose').value,
+    chemicals: chemicalsPayload,
+  };
+
+  const res = await apiFetch('/api/bookings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    msg.innerHTML = `<div class="error">${data.error}</div>`;
+    return;
+  }
+  msg.innerHTML = `<div class="success">ส่งคำขอจองสำเร็จ รอการอนุมัติ</div>`;
+  document.getElementById('bookingForm').reset();
+  document.getElementById('chemRows').innerHTML = '';
+  loadMyBookings();
+});
+
+async function loadMyBookings() {
+  const res = await apiFetch('/api/bookings');
+  const data = await res.json();
+  const mine = data.bookings.filter(b => b.user_id === currentUser.id);
+  const rows = document.getElementById('myRows');
+  if (!mine.length) {
+    rows.innerHTML = '<tr><td colspan="5">ยังไม่มีการจอง</td></tr>';
+    return;
+  }
+  rows.innerHTML = mine.map(b => `
+    <tr>
+      <td>${b.room_name}</td>
+      <td>${fmtDt(b.start_dt)} - ${fmtDt(b.end_dt)}</td>
+      <td>${b.purpose || '-'}</td>
+      <td>${statusBadge(b.status)}</td>
+      <td>${b.status === 'approved' ? `<button class="completeBtn" data-id="${b.id}">บันทึกใช้จริง / เสร็จสิ้น</button>` : '-'}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('myRows').addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('completeBtn')) return;
+  completingBookingId = e.target.dataset.id;
+
+  const res = await apiFetch(`/api/bookings/${completingBookingId}/requests`);
+  const data = await res.json();
+
+  const completeRows = document.getElementById('completeRows');
+  if (!data.requests.length) {
+    completeRows.innerHTML = `<p class="muted">การจองนี้ไม่มีสารเคมีที่ขอใช้ คลิกยืนยันเพื่อปิดงานได้เลย</p>`;
+  } else {
+    completeRows.innerHTML = data.requests.map(r => `
+      <div class="chem-row">
+        <span style="flex:1;">${r.chemical_name} (${r.unit}) — ขอไว้ ${r.requested_qty}</span>
+        <input type="number" class="actual-qty" data-chemical-id="${r.chemical_id}" value="${r.requested_qty}" min="0" step="0.01">
+      </div>
+    `).join('');
+  }
+  document.getElementById('completeMsg').innerHTML = '';
+  document.getElementById('completeCard').style.display = 'block';
+  document.getElementById('completeCard').scrollIntoView({ behavior: 'smooth' });
+});
+
+document.getElementById('cancelCompleteBtn').addEventListener('click', () => {
+  completingBookingId = null;
+  document.getElementById('completeCard').style.display = 'none';
+});
+
+document.getElementById('confirmCompleteBtn').addEventListener('click', async () => {
+  const inputs = [...document.querySelectorAll('.actual-qty')];
+  const actual_usage = inputs.map(i => ({
+    chemical_id: i.dataset.chemicalId,
+    actual_used_qty: Number(i.value),
+  }));
+
+  const res = await apiFetch(`/api/bookings/${completingBookingId}/complete`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actual_usage }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    document.getElementById('completeMsg').innerHTML = `<div class="error">${data.error}</div>`;
+    return;
+  }
+  document.getElementById('completeCard').style.display = 'none';
+  completingBookingId = null;
+  loadMyBookings();
+});
+
+(async () => {
+  currentUser = await requireAuth();
+  populatePeriods();
+  setMinBookingDate();
+  await loadRooms();
+  await loadChemicals();
+  await loadMyBookings();
+})();
+</script>
+</body>
+</html>

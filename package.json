@@ -1,0 +1,15 @@
+{
+  "name": "lab-booking",
+  "version": "2.0.0",
+  "description": "LAB Booking & Chemical Inventory System (Netlify + Firestore + Google Sign-In)",
+  "private": true,
+  "scripts": {
+    "seed": "node scripts/seed-firestore.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

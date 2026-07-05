@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>สต็อกสารเคมี - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — สต็อกสารเคมี</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>สต็อกสารเคมีทั้งหมด</h2>
+    <table>
+      <thead><tr><th>ชื่อ</th><th>หน่วย</th><th>สต็อกปัจจุบัน</th><th>เกณฑ์แจ้งเตือน</th><th>การทำงาน</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="5">กำลังโหลด...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+
+async function loadInventory() {
+  const res = await apiFetch('/api/inventory');
+  const data = await res.json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = data.inventory.map(item => `
+    <tr>
+      <td>${item.name}</td>
+      <td>${item.unit}</td>
+      <td class="${item.low_stock ? 'low-stock' : ''}">${item.current_stock}${item.low_stock ? ' ⚠ ต่ำกว่าเกณฑ์' : ''}</td>
+      <td>${item.min_threshold}</td>
+      <td><button class="editBtn" data-id="${item.id}" data-stock="${item.current_stock}" data-threshold="${item.min_threshold}">แก้ไข</button></td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('rows').addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('editBtn')) return;
+  const id = e.target.dataset.id;
+  const stock = prompt('สต็อกปัจจุบันใหม่:', e.target.dataset.stock);
+  if (stock === null) return;
+  const threshold = prompt('เกณฑ์แจ้งเตือนใหม่:', e.target.dataset.threshold);
+  if (threshold === null) return;
+
+  const res = await apiFetch(`/api/inventory/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_stock: Number(stock), min_threshold: Number(threshold) }),
+  });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error); return; }
+  loadInventory();
+});
+
+(async () => {
+  currentUser = await requireAuth({ approverOnly: true });
+  await loadInventory();
+})();
+</script>
+</body>
+</html>

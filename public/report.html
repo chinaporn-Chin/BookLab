@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>รายงานการใช้สารเคมี - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — รายงานการใช้สารเคมีรายเดือน</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>รายงานการใช้สารเคมี</h2>
+    <div class="field" style="max-width:220px;">
+      <label>เดือน</label>
+      <input type="month" id="monthPicker">
+    </div>
+    <table>
+      <thead><tr><th>ผู้ใช้</th><th>สารเคมี</th><th>จำนวนที่ใช้จริง</th><th>หน่วย</th><th>จำนวนการจอง</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="5">กำลังโหลด...</td></tr></tbody>
+    </table>
+    <p class="muted" id="emptyMsg" style="display:none;">ไม่มีข้อมูลการใช้สารเคมีในเดือนนี้</p>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+
+async function loadReport() {
+  const month = document.getElementById('monthPicker').value;
+  const res = await apiFetch(`/api/reports/chemical-usage?month=${month}`);
+  const data = await res.json();
+  const rows = document.getElementById('rows');
+  const emptyMsg = document.getElementById('emptyMsg');
+  if (!data.rows.length) {
+    rows.innerHTML = '';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  rows.innerHTML = data.rows.map(r => `
+    <tr>
+      <td>${r.user_name}</td>
+      <td>${r.chemical_name}</td>
+      <td>${r.total_used}</td>
+      <td>${r.unit}</td>
+      <td>${r.booking_count}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('monthPicker').addEventListener('change', loadReport);
+
+(async () => {
+  currentUser = await requireAuth({ approverOnly: true });
+  const now = new Date();
+  document.getElementById('monthPicker').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  await loadReport();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ปฏิทินห้อง - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — ปฏิทินการใช้ห้อง</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <div class="cal-header">
+      <button id="prevMonth" class="secondary">&laquo; เดือนก่อน</button>
+      <h2 id="monthLabel"></h2>
+      <button id="nextMonth" class="secondary">เดือนถัดไป &raquo;</button>
+    </div>
+    <div class="field" style="max-width:260px;">
+      <label>กรองเฉพาะห้อง</label>
+      <select id="roomFilter">
+        <option value="">ทุกห้อง</option>
+      </select>
+    </div>
+    <div class="cal-grid" id="calDow"></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <p class="muted" style="margin-top:10px;">
+      <span class="cal-event pending" style="padding:2px 8px;">รอดำเนินการ</span>
+      <span class="cal-event approved" style="padding:2px 8px;">อนุมัติแล้ว</span>
+      <span class="cal-event completed" style="padding:2px 8px;">เสร็จสิ้น</span>
+    </p>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+let rooms = [];
+let viewYear, viewMonth; // viewMonth: 0-11
+
+const dowNames = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+const monthNames = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+async function loadRooms() {
+  const res = await apiFetch('/api/rooms');
+  const data = await res.json();
+  rooms = data.rooms;
+  document.getElementById('roomFilter').innerHTML =
+    '<option value="">ทุกห้อง</option>' +
+    rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+}
+
+function renderDow() {
+  document.getElementById('calDow').innerHTML = dowNames.map(d => `<div class="cal-dow">${d}</div>`).join('');
+}
+
+function isToday(y, m, d) {
+  const now = new Date();
+  return now.getFullYear() === y && now.getMonth() === m && now.getDate() === d;
+}
+
+async function renderCalendar() {
+  document.getElementById('monthLabel').textContent = `${monthNames[viewMonth]} ${viewYear + 543}`;
+
+  const roomId = document.getElementById('roomFilter').value;
+  const res = await apiFetch('/api/bookings' + (roomId ? `?room_id=${roomId}` : ''));
+  const data = await res.json();
+  const bookings = data.bookings.filter(b => b.status !== 'rejected');
+
+  // group bookings by date (YYYY-MM-DD, local)
+  const byDate = {};
+  for (const b of bookings) {
+    const start = new Date(b.start_dt);
+    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`;
+    if (!byDate[key]) byDate[key] = [];
+    byDate[key].push(b);
+  }
+
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) {
+    cells += '<div class="cal-cell empty"></div>';
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayBookings = byDate[key] || [];
+    const todayClass = isToday(viewYear, viewMonth, d) ? ' today' : '';
+    const events = dayBookings.map(b => {
+      const t = new Date(b.start_dt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="cal-event ${b.status}" title="${b.room_name} ${t} - ${b.user_name} (${b.purpose || ''})">${t} ${b.room_name}</div>`;
+    }).join('');
+    cells += `<div class="cal-cell${todayClass}"><div class="cal-date">${d}</div>${events}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML = cells;
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  viewMonth--;
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  viewMonth++;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  renderCalendar();
+});
+document.getElementById('roomFilter').addEventListener('change', renderCalendar);
+
+(async () => {
+  currentUser = await requireAuth();
+  await loadRooms();
+  const now = new Date();
+  viewYear = now.getFullYear();
+  viewMonth = now.getMonth();
+  renderDow();
+  await renderCalendar();
+})();
+</script>
+</body>
+</html>
