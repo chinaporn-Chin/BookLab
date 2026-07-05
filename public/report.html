@@ -13,9 +13,13 @@
 <div class="container">
   <div class="card">
     <h2>รายงานการใช้สารเคมี</h2>
-    <div class="field" style="max-width:220px;">
-      <label>เดือน</label>
-      <input type="month" id="monthPicker">
+    <div class="chem-row" style="align-items:flex-end;">
+      <div class="field" style="max-width:220px;">
+        <label>เดือน</label>
+        <input type="month" id="monthPicker">
+      </div>
+      <button type="button" id="exportExcelBtn" class="secondary">Export Excel</button>
+      <button type="button" id="exportPdfBtn" class="secondary">Export PDF</button>
     </div>
     <table>
       <thead><tr><th>ผู้ใช้</th><th>สารเคมี</th><th>จำนวนที่ใช้จริง</th><th>หน่วย</th><th>จำนวนการจอง</th></tr></thead>
@@ -27,13 +31,21 @@
 
 <script type="module">
 import { requireAuth, apiFetch } from './auth.js';
+import * as XLSX from 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
+import { jsPDF } from 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/+esm';
+import autoTable from 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/+esm';
 
 let currentUser = null;
+let currentRows = [];
+let currentMonth = '';
+
+const COLS = { user_name: 'ผู้ใช้', chemical_name: 'สารเคมี', total_used: 'จำนวนที่ใช้จริง', unit: 'หน่วย', booking_count: 'จำนวนการจอง' };
 
 async function loadReport() {
-  const month = document.getElementById('monthPicker').value;
-  const res = await apiFetch(`/api/reports/chemical-usage?month=${month}`);
+  currentMonth = document.getElementById('monthPicker').value;
+  const res = await apiFetch(`/api/reports/chemical-usage?month=${currentMonth}`);
   const data = await res.json();
+  currentRows = data.rows;
   const rows = document.getElementById('rows');
   const emptyMsg = document.getElementById('emptyMsg');
   if (!data.rows.length) {
@@ -54,6 +66,31 @@ async function loadReport() {
 }
 
 document.getElementById('monthPicker').addEventListener('change', loadReport);
+
+document.getElementById('exportExcelBtn').addEventListener('click', () => {
+  const sheetData = currentRows.map(r => ({
+    [COLS.user_name]: r.user_name,
+    [COLS.chemical_name]: r.chemical_name,
+    [COLS.total_used]: r.total_used,
+    [COLS.unit]: r.unit,
+    [COLS.booking_count]: r.booking_count,
+  }));
+  const ws = XLSX.utils.json_to_sheet(sheetData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Report');
+  XLSX.writeFile(wb, `chemical_usage_${currentMonth}.xlsx`);
+});
+
+document.getElementById('exportPdfBtn').addEventListener('click', () => {
+  const doc = new jsPDF();
+  doc.text(`รายงานการใช้สารเคมี — ${currentMonth}`, 14, 14);
+  autoTable(doc, {
+    startY: 20,
+    head: [[COLS.user_name, COLS.chemical_name, COLS.total_used, COLS.unit, COLS.booking_count]],
+    body: currentRows.map(r => [r.user_name, r.chemical_name, r.total_used, r.unit, r.booking_count]),
+  });
+  doc.save(`chemical_usage_${currentMonth}.pdf`);
+});
 
 (async () => {
   currentUser = await requireAuth({ approverOnly: true });

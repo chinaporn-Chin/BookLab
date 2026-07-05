@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ผู้ใช้งาน - LAB Booking</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <div><b>LAB Booking</b> — จัดการผู้ใช้งาน</div>
+  <div id="nav"></div>
+</div>
+<div class="container">
+  <div class="card">
+    <h2>ผู้ใช้งานทั้งหมด</h2>
+    <table>
+      <thead><tr><th>ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3">กำลังโหลด...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import { requireAuth, apiFetch } from './auth.js';
+
+let currentUser = null;
+
+function roleSelectHtml(user) {
+  const disabled = user.id === currentUser.id ? 'disabled title="ไม่สามารถลดสิทธิ์ตัวเองได้"' : '';
+  return `
+    <select class="roleSelect" data-id="${user.id}" ${disabled}>
+      <option value="researcher" ${user.role === 'researcher' ? 'selected' : ''}>User</option>
+      <option value="approver" ${user.role === 'approver' ? 'selected' : ''}>Admin</option>
+    </select>
+  `;
+}
+
+async function loadUsers() {
+  const res = await apiFetch('/api/users');
+  const data = await res.json();
+  const rows = document.getElementById('rows');
+  if (!data.users || !data.users.length) {
+    rows.innerHTML = '<tr><td colspan="3">ไม่พบผู้ใช้งาน</td></tr>';
+    return;
+  }
+  rows.innerHTML = data.users.map(u => `
+    <tr>
+      <td>${u.name}</td>
+      <td>${u.email}</td>
+      <td>${roleSelectHtml(u)}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('rows').addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('roleSelect')) return;
+  const id = e.target.dataset.id;
+  const role = e.target.value;
+  const res = await apiFetch(`/api/users/${id}/role`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.error);
+    loadUsers();
+    return;
+  }
+  loadUsers();
+});
+
+(async () => {
+  currentUser = await requireAuth({ approverOnly: true });
+  await loadUsers();
+})();
+</script>
+</body>
+</html>

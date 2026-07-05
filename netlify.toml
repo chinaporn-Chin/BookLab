@@ -53,3 +53,13 @@
   from = "/api/me"
   to = "/.netlify/functions/me"
   status = 200
+
+[[redirects]]
+  from = "/api/users/:id/role"
+  to = "/.netlify/functions/user-role?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/users"
+  to = "/.netlify/functions/users"
+  status = 200

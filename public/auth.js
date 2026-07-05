@@ -44,6 +44,7 @@ const NAV_LINKS = [
   { href: 'approve.html', label: 'อนุมัติ', approverOnly: true },
   { href: 'inventory.html', label: 'สต็อกสารเคมี', approverOnly: true },
   { href: 'report.html', label: 'รายงานสารเคมี', approverOnly: true },
+  { href: 'users.html', label: 'ผู้ใช้งาน', approverOnly: true },
 ];
 
 function renderNav(user) {

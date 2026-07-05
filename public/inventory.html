@@ -12,7 +12,27 @@
 </div>
 <div class="container">
   <div class="card">
+    <h2>เพิ่มสารเคมีใหม่</h2>
+    <form id="addChemForm">
+      <div class="chem-row">
+        <input type="text" id="newName" placeholder="ชื่อสารเคมี" required>
+        <input type="text" id="newUnit" placeholder="หน่วย (เช่น mL, g)" required>
+        <input type="number" id="newStock" placeholder="สต็อกเริ่มต้น" min="0" step="0.01" required>
+        <input type="number" id="newThreshold" placeholder="เกณฑ์แจ้งเตือน" min="0" step="0.01" required>
+        <button type="submit">+ เพิ่มสารเคมีใหม่</button>
+      </div>
+      <div id="addMsg"></div>
+    </form>
+  </div>
+
+  <div class="card">
     <h2>สต็อกสารเคมีทั้งหมด</h2>
+    <div class="chem-row" style="margin-bottom:12px;">
+      <button type="button" id="exportBtn" class="secondary">Export Excel</button>
+      <input type="file" id="importFile" accept=".xlsx,.xls" style="flex:1;">
+      <button type="button" id="importBtn" class="secondary">Import Excel</button>
+    </div>
+    <div id="importMsg"></div>
     <table>
       <thead><tr><th>ชื่อ</th><th>หน่วย</th><th>สต็อกปัจจุบัน</th><th>เกณฑ์แจ้งเตือน</th><th>การทำงาน</th></tr></thead>
       <tbody id="rows"><tr><td colspan="5">กำลังโหลด...</td></tr></tbody>
@@ -22,12 +42,17 @@
 
 <script type="module">
 import { requireAuth, apiFetch } from './auth.js';
+import * as XLSX from 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
 
 let currentUser = null;
+let currentInventory = [];
+
+const COLS = { name: 'ชื่อ', unit: 'หน่วย', current_stock: 'สต็อกปัจจุบัน', min_threshold: 'เกณฑ์แจ้งเตือน' };
 
 async function loadInventory() {
   const res = await apiFetch('/api/inventory');
   const data = await res.json();
+  currentInventory = data.inventory;
   const rows = document.getElementById('rows');
   rows.innerHTML = data.inventory.map(item => `
     <tr>
@@ -55,6 +80,87 @@ document.getElementById('rows').addEventListener('click', async (e) => {
   });
   const data = await res.json();
   if (!res.ok) { alert(data.error); return; }
+  loadInventory();
+});
+
+document.getElementById('addChemForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const addMsg = document.getElementById('addMsg');
+  addMsg.innerHTML = '';
+
+  const payload = {
+    name: document.getElementById('newName').value,
+    unit: document.getElementById('newUnit').value,
+    current_stock: Number(document.getElementById('newStock').value),
+    min_threshold: Number(document.getElementById('newThreshold').value),
+  };
+
+  const res = await apiFetch('/api/inventory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    addMsg.innerHTML = `<div class="error">${data.error}</div>`;
+    return;
+  }
+  addMsg.innerHTML = `<div class="success">เพิ่มสารเคมีสำเร็จ</div>`;
+  document.getElementById('addChemForm').reset();
+  loadInventory();
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const sheetData = currentInventory.map(item => ({
+    [COLS.name]: item.name,
+    [COLS.unit]: item.unit,
+    [COLS.current_stock]: item.current_stock,
+    [COLS.min_threshold]: item.min_threshold,
+  }));
+  const ws = XLSX.utils.json_to_sheet(sheetData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+  XLSX.writeFile(wb, 'chemical_inventory.xlsx');
+});
+
+document.getElementById('importBtn').addEventListener('click', async () => {
+  const importMsg = document.getElementById('importMsg');
+  importMsg.innerHTML = '';
+  const file = document.getElementById('importFile').files[0];
+  if (!file) {
+    importMsg.innerHTML = `<div class="error">กรุณาเลือกไฟล์ Excel ก่อน</div>`;
+    return;
+  }
+
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws);
+
+  const items = rows.map(r => ({
+    name: r[COLS.name],
+    unit: r[COLS.unit],
+    current_stock: r[COLS.current_stock],
+    min_threshold: r[COLS.min_threshold],
+  })).filter(i => i.name);
+
+  if (!items.length) {
+    importMsg.innerHTML = `<div class="error">ไม่พบข้อมูลที่นำเข้าได้ในไฟล์นี้</div>`;
+    return;
+  }
+
+  const res = await apiFetch('/api/inventory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    importMsg.innerHTML = `<div class="error">${data.error}</div>`;
+    return;
+  }
+  importMsg.innerHTML = `<div class="success">นำเข้าสำเร็จ ${data.imported} รายการ</div>`;
+  document.getElementById('importFile').value = '';
   loadInventory();
 });
 
