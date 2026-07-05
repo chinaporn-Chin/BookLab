@@ -1,10 +1,9 @@
-const { requireApprover, HttpError, json, db } = require('./_lib/auth');
+const { requireApprover, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 exports.handler = async (event) => {
-  console.log('DEBUG booking-approve event.path=', event.path, 'rawUrl=', event.rawUrl, 'queryStringParameters=', JSON.stringify(event.queryStringParameters));
   try {
     const user = await requireApprover(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 2);
     const body = JSON.parse(event.body || '{}');
 
     await db.runTransaction(async (tx) => {

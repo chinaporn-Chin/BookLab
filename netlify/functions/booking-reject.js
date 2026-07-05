@@ -1,9 +1,9 @@
-const { requireApprover, HttpError, json, db } = require('./_lib/auth');
+const { requireApprover, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 exports.handler = async (event) => {
   try {
     const user = await requireApprover(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 2);
     const { comment } = JSON.parse(event.body || '{}');
 
     const bookingRef = db.collection('bookings').doc(id);

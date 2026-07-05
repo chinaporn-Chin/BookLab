@@ -1,11 +1,11 @@
-const { requireApprover, HttpError, json, db } = require('./_lib/auth');
+const { requireApprover, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 const VALID_ROLES = ['researcher', 'approver'];
 
 exports.handler = async (event) => {
   try {
     const requester = await requireApprover(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 2);
     const { role } = JSON.parse(event.body || '{}');
 
     if (!VALID_ROLES.includes(role)) {

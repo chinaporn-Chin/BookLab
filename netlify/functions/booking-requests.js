@@ -1,9 +1,9 @@
-const { requireLogin, HttpError, json, db } = require('./_lib/auth');
+const { requireLogin, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 exports.handler = async (event) => {
   try {
     await requireLogin(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 2);
 
     const bookingSnap = await db.collection('bookings').doc(id).get();
     if (!bookingSnap.exists) return json(404, { error: 'ไม่พบการจอง' });

@@ -1,9 +1,9 @@
-const { requireLogin, HttpError, json, db } = require('./_lib/auth');
+const { requireLogin, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 exports.handler = async (event) => {
   try {
     await requireLogin(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 2);
     const { actual_usage } = JSON.parse(event.body || '{}'); // [{ chemical_id, actual_used_qty }]
 
     await db.runTransaction(async (tx) => {

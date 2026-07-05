@@ -1,9 +1,9 @@
-const { requireApprover, HttpError, json, db } = require('./_lib/auth');
+const { requireApprover, idFromPath, HttpError, json, db } = require('./_lib/auth');
 
 exports.handler = async (event) => {
   try {
     await requireApprover(event);
-    const { id } = event.queryStringParameters || {};
+    const id = idFromPath(event, 1);
     const { current_stock, min_threshold } = JSON.parse(event.body || '{}');
 
     const itemRef = db.collection('chemical_inventory').doc(id);

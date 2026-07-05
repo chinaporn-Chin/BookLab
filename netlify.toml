@@ -6,22 +6,22 @@
 
 [[redirects]]
   from = "/api/bookings/:id/requests"
-  to = "/.netlify/functions/booking-requests?id=:id"
+  to = "/.netlify/functions/booking-requests"
   status = 200
 
 [[redirects]]
   from = "/api/bookings/:id/approve"
-  to = "/.netlify/functions/booking-approve?id=:id"
+  to = "/.netlify/functions/booking-approve"
   status = 200
 
 [[redirects]]
   from = "/api/bookings/:id/reject"
-  to = "/.netlify/functions/booking-reject?id=:id"
+  to = "/.netlify/functions/booking-reject"
   status = 200
 
 [[redirects]]
   from = "/api/bookings/:id/complete"
-  to = "/.netlify/functions/booking-complete?id=:id"
+  to = "/.netlify/functions/booking-complete"
   status = 200
 
 [[redirects]]
@@ -31,7 +31,7 @@
 
 [[redirects]]
   from = "/api/inventory/:id"
-  to = "/.netlify/functions/inventory-item?id=:id"
+  to = "/.netlify/functions/inventory-item"
   status = 200
 
 [[redirects]]
@@ -56,7 +56,7 @@
 
 [[redirects]]
   from = "/api/users/:id/role"
-  to = "/.netlify/functions/user-role?id=:id"
+  to = "/.netlify/functions/user-role"
   status = 200
 
 [[redirects]]

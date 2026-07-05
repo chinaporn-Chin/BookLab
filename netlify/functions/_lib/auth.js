@@ -15,6 +15,17 @@ function json(statusCode, body) {
   };
 }
 
+// Netlify's `to = "/.netlify/functions/x?id=:id"` redirect substitution does
+// not populate event.queryStringParameters, so dynamic path segments are
+// parsed directly from the real incoming path (event.path) instead.
+// positionFromEnd=1 -> last segment (e.g. /api/inventory/:id)
+// positionFromEnd=2 -> second-to-last (e.g. /api/bookings/:id/approve)
+function idFromPath(event, positionFromEnd = 1) {
+  const segments = event.path.split('/').filter(Boolean);
+  const raw = segments[segments.length - positionFromEnd] || '';
+  return decodeURIComponent(raw);
+}
+
 function getApproverEmails() {
   return (process.env.APPROVER_EMAILS || '')
     .split(',')
@@ -67,4 +78,4 @@ async function requireApprover(event) {
   return user;
 }
 
-module.exports = { getUser, requireLogin, requireApprover, HttpError, json, db, admin };
+module.exports = { getUser, requireLogin, requireApprover, idFromPath, HttpError, json, db, admin };
