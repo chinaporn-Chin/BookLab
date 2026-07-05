@@ -4,7 +4,7 @@ function slugify(name) {
   return name
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/[^a-z0-9฀-๿]+/g, '_')
     .replace(/^_+|_+$/g, '');
 }
 
@@ -46,6 +46,8 @@ async function createChemical(body) {
   if (!name) return json(400, { error: 'ชื่อสารเคมีจำเป็น' });
 
   const id = slugify(name);
+  if (!id) return json(400, { error: 'ชื่อสารเคมีไม่ถูกต้อง' });
+
   const existing = await db.collection('chemical_inventory').doc(id).get();
   if (existing.exists) {
     return json(409, { error: 'มีสารเคมีชื่อนี้อยู่แล้ว' });
