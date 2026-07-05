@@ -99,6 +99,7 @@ exports.handler = async (event) => {
     return json(405, { error: 'Method not allowed' });
   } catch (err) {
     if (err instanceof HttpError) return json(err.statusCode, { error: err.message });
+    console.error('bookings error:', err.stack || err);
     return json(500, { error: err.message });
   }
 };

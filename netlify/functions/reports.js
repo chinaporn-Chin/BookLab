@@ -56,6 +56,7 @@ exports.handler = async (event) => {
     return json(200, { month: m, rows });
   } catch (err) {
     if (err instanceof HttpError) return json(err.statusCode, { error: err.message });
+    console.error('reports error:', err.stack || err);
     return json(500, { error: err.message });
   }
 };

@@ -32,6 +32,7 @@ exports.handler = async (event) => {
     return json(200, { booking, requests });
   } catch (err) {
     if (err instanceof HttpError) return json(err.statusCode, { error: err.message });
+    console.error('booking-requests error:', err.stack || err);
     return json(500, { error: err.message });
   }
 };
