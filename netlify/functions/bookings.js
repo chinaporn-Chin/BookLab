@@ -1,6 +1,9 @@
 const { requireLogin, HttpError, json, db } = require('./_lib/auth');
+const { autoCompleteOverdueBookings } = require('./_lib/autoComplete');
 
 async function listBookings(event) {
+  await autoCompleteOverdueBookings();
+
   const { room_id, date } = event.queryStringParameters || {};
 
   let query = db.collection('bookings');

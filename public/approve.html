@@ -14,8 +14,8 @@
   <div class="card">
     <h2>รายการรออนุมัติ</h2>
     <table>
-      <thead><tr><th>ห้อง</th><th>ผู้จอง</th><th>วันเวลา</th><th>วัตถุประสงค์</th><th>สถานะ</th><th>การทำงาน</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="6">กำลังโหลด...</td></tr></tbody>
+      <thead><tr><th>ห้อง</th><th>ผู้จอง</th><th>วันเวลา</th><th>วัตถุประสงค์</th><th>สารเคมีที่ขอใช้</th><th>สถานะ</th><th>การทำงาน</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="7">กำลังโหลด...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -33,21 +33,34 @@ function statusBadge(status) {
   return `<span class="badge ${status}">${labels[status] || status}</span>`;
 }
 
+function chemListText(requests) {
+  if (!requests.length) return '-';
+  return requests.map(r => `${r.chemical_name} ${r.requested_qty} ${r.unit}`).join(', ');
+}
+
 async function loadBookings() {
   const res = await apiFetch('/api/bookings');
   const data = await res.json();
   const pending = data.bookings.filter(b => b.status === 'pending');
   const rows = document.getElementById('rows');
   if (!pending.length) {
-    rows.innerHTML = '<tr><td colspan="6">ไม่มีรายการรออนุมัติ</td></tr>';
+    rows.innerHTML = '<tr><td colspan="7">ไม่มีรายการรออนุมัติ</td></tr>';
     return;
   }
-  rows.innerHTML = pending.map(b => `
+
+  const chemLists = await Promise.all(pending.map(async (b) => {
+    const r = await apiFetch(`/api/bookings/${b.id}/requests`);
+    const d = await r.json();
+    return r.ok ? d.requests : [];
+  }));
+
+  rows.innerHTML = pending.map((b, i) => `
     <tr>
       <td>${b.room_name}</td>
       <td>${b.user_name}</td>
       <td>${fmtDt(b.start_dt)} - ${fmtDt(b.end_dt)}</td>
       <td>${b.purpose || '-'}</td>
+      <td>${chemListText(chemLists[i])}</td>
       <td>${statusBadge(b.status)}</td>
       <td>
         <button class="approveBtn" data-id="${b.id}">อนุมัติ</button>

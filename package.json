@@ -10,6 +10,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@netlify/functions": "^2.8.2",
     "firebase-admin": "^12.7.0"
   }
 }
