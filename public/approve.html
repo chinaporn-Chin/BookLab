@@ -35,7 +35,7 @@ function statusBadge(status) {
 
 function chemListText(requests) {
   if (!requests.length) return '-';
-  return requests.map(r => `${r.chemical_name} ${r.requested_qty} ${r.unit}`).join(', ');
+  return requests.map(r => `<div>${r.chemical_name} ${r.requested_qty} ${r.unit}</div>`).join('');
 }
 
 async function loadBookings() {
